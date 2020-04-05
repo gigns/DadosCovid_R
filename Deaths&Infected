@@ -1,0 +1,93 @@
+library(tidyverse)
+library(lubridate)
+library(magrittr)
+
+confirmedPath <- 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv'
+deathsPath <- 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv'
+dados_paises_covid_confirmed <- read_csv(confirmedPath)
+dados_paises_covid_deaths <- read_csv(deathsPath)
+
+# Ajustes de dados confirmados
+
+dados_paises_covid_confirmed %<>% 
+  rename(province = 'Province/State',
+         country = 'Country/Region')
+
+dados_paises_covid_confirmed %<>% 
+  gather( key = 'date', 
+          value = 'infected', 
+          -c(province:Long))
+
+dados_paises_covid_confirmed %<>% 
+  mutate( date = ymd(parse_date_time(date, 
+                                     orders = c("ymd", "dmy", "mdy"))) )
+
+dados_paises_covid_confirmed %>% filter(country %in% c('Portugal','Brazil')) %>% 
+  group_by(country) %>% 
+  print(n=Inf)
+
+
+
+# Ajustes de dados de mortos
+
+dados_paises_covid_deaths %<>% 
+  rename(province = 'Province/State',
+         country = 'Country/Region')
+
+dados_paises_covid_deaths %<>% 
+  gather( key = 'date', 
+          value = 'mortos', 
+          -c(province:Long))
+
+dados_paises_covid_deaths %<>%
+  mutate( date = ymd(parse_date_time(date, 
+                                     orders = c("ymd", "dmy", "mdy"))) )
+
+
+dados_paises_covid_deaths %>% filter(country %in% c('Portugal','Brazil')) %>% 
+  group_by(country) %>%
+  print(n=Inf)
+
+deaths <- data.frame(dados_paises_covid_deaths)
+infected <- data.frame(dados_paises_covid_confirmed)
+
+(total <- merge(deaths,infected))
+
+
+total %>% filter(country %in% c('Portugal','Brazil')) %>% 
+  print(n=Inf)
+
+total %>% 
+  distinct(country) %>% 
+  print(n=Inf)
+
+total %>% 
+  filter( country == 'Portugal') %>% 
+  ggplot( aes( x = date,
+               y = infected ) ) +
+  geom_point(colour = "firebrick") +
+  geom_line(colour = "firebrick") +
+  geom_smooth(method = lm, formula = y ~ splines::bs(x, 6), se = FALSE) +
+  labs(x = "Data", y = "Infectados") 
+
+
+# Gráfico Infectados
+total %>% 
+  filter( country %in% c('Brazil','Portugal')) %>% 
+  ggplot( aes( x = date,
+               y = infected,
+               colour = country) ) +
+  geom_point() +
+  geom_line() 
+
+
+# Gráfico Mortos
+total %>% 
+  filter( country %in% c('Brazil','Portugal')) %>% 
+  ggplot( aes( x = date,
+               y = mortos,
+               colour = country) ) +
+  geom_point() +
+  geom_line() 
+             
+                                  
