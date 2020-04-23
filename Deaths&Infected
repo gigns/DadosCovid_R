@@ -4,10 +4,8 @@ library(magrittr)
 
 confirmedPath <- 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv'
 deathsPath <- 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv'
-recoveredPath <- 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv'
 dados_paises_covid_confirmed <- read_csv(confirmedPath)
 dados_paises_covid_deaths <- read_csv(deathsPath)
-dados_paises_covid_recovered <- read_csv(recoveredPath)
 
 # Ajustes de dados confirmados
 
@@ -38,7 +36,7 @@ dados_paises_covid_deaths %<>%
 
 dados_paises_covid_deaths %<>% 
   gather( key = 'date', 
-          value = 'mortos', 
+          value = 'deaths', 
           -c(province:Long))
 
 dados_paises_covid_deaths %<>%
@@ -50,26 +48,31 @@ dados_paises_covid_deaths %>% filter(country %in% c('Portugal','Brazil')) %>%
   group_by(country) %>%
   print(n=Inf)
 
+covid_deaths <- dados_paises_covid_deaths %>%  filter(country %in% c('Portugal','Brazil')) %>% 
+  group_by(country) %>%
+  print(n=Inf)
+
 
 # Juntando as tabelas
 
 dados_paises_covid_confirmed %<>% 
   bind_cols(., dados_paises_covid_deaths %>% 
-              select(mortos) ) %>% 
+              select(deaths) ) %>% 
   print(n=5)
+  
 
 # selecionar os paises
 
 dados_paises_filtrados <- dados_paises_covid_confirmed %>% 
   filter( country %in% c('Brazil', 'Portugal') ) %>% 
-  print(n=Inf)
+  print(n=5)
 
 dados_paises_filtrados %<>% 
   group_by(country, date) %>% 
   summarise( Lat = mean(Lat),
              Long = mean(Long),
              infected = sum(infected),
-             dead = sum(mortos)) %>% 
+             dead = sum(deaths)) %>% 
   ungroup
 
 
@@ -85,6 +88,7 @@ dados_paises_filtrados %>%
                group = numbers) ) +
   geom_line(aes(color = numbers, linetype=country),  size=1.2) +
   facet_wrap(~ country )
+
 
 # Gráfico 2
 
@@ -113,22 +117,33 @@ dados_paises_filtrados %>%
 
 # Gráfico 4
 
-dados_paises_filtrados %>% 
-  select(country, date, dead) %>% 
-  ggplot( aes( x = date,
-               y = dead,
-               colour = country, 
-               fill = country) ) +
-  geom_line(aes(linetype=country), size=1.2)
-
-# Gráfico 5
-
 paises_sum <- dados_paises_filtrados %>%
   group_by(country) %>% 
   summarise( last_date = max(date),
              last_infected = last(infected),
              last_dead = last(dead) )
 
+dados_paises_filtrados %>% 
+  select(country, date, dead) %>% 
+  ggplot( aes( x = date,
+               y = dead,
+               colour = country, 
+               fill = country) ) +
+  geom_line(aes(linetype=country), size=1.2) +
+  ylab('No. People') +
+  xlab('Date') +
+  annotate(geom="text", 
+           x=paises_sum$last_date[1], 
+           y=paises_sum$last_dead[1], 
+           label=paste0("Brazil: ", paises_sum$last_dead[1]),
+           color="black") +
+  annotate(geom="text", 
+           x=paises_sum$last_date[2], 
+           y=paises_sum$last_dead[2], 
+           label=paste0("Portugal: ", paises_sum$last_dead[2]),
+           color="black")
+
+# Gráfico 5
 
 dados_paises_filtrados %>% 
   select(country, date, infected, dead) %>% 
@@ -144,92 +159,145 @@ dados_paises_filtrados %>%
   annotate(geom="text", 
            x=paises_sum$last_date[1], 
            y=paises_sum$last_infected[1], 
-           label=paste0("Portugal: ", paises_sum$last_infected[1]),
+           label=paste0("Brazil: ", paises_sum$last_infected[1]),
            color="black") +
   annotate(geom="text", 
            x=paises_sum$last_date[1], 
            y=paises_sum$last_dead[1], 
-           label=paste0("Portugal: ", paises_sum$last_dead[1]),
+           label=paste0("Brazil: ", paises_sum$last_dead[1]),
            color="black") +
   annotate(geom="text", 
            x=paises_sum$last_date[2], 
            y=paises_sum$last_infected[2], 
-           label=paste0("Brazil: ", paises_sum$last_infected[2]),
+           label=paste0("Portugal: ", paises_sum$last_infected[2]),
            color="black")+
   annotate(geom="text", 
            x=paises_sum$last_date[2], 
            y=paises_sum$last_dead[2], 
-           label=paste0("Brazil: ", paises_sum$last_dead[2]),
+           label=paste0("Portugal: ", paises_sum$last_dead[2]),
            color="black")
 
 
+# ----------------------------------------------------------
 
 
-# Ajuste de dados de recuperados
-
-dados_paises_covid_recovered %<>% 
-  rename(province = 'Province/State',
-         country = 'Country/Region')
-
-dados_paises_covid_recovered %<>% 
-  gather( key = 'date', 
-          value = 'recovered', 
-          -c(province:Long))
-
-dados_paises_covid_recovered %<>%
-  mutate( date = ymd(parse_date_time(date, 
-                                     orders = c("ymd", "dmy", "mdy"))) )
-
-dados_paises_covid_recovered %>% filter(country %in% c('Portugal','Brazil')) %>% 
-  group_by(country) %>% 
-  print(n=Inf)
+library(ggplot2)
+library(gganimate)
+library(magick)
+library(gifski)
 
 
+deaths_confirmed <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv")
+head(deaths_confirmed)
+colnames(deaths_confirmed)
 
 
-total2 %>% filter(country %in% c('Portugal','Brazil')) %>% 
-  print(n=Inf)
-
-total2 %>% 
-  distinct(country) %>% 
-  print(n=Inf)
-
-total2 %>% 
-  filter( country == 'Portugal') %>% 
-  ggplot( aes( x = date,
-               y = infected ) ) +
-  geom_point(colour = "firebrick") +
-  geom_line(colour = "firebrick") +
-  geom_smooth(method = lm, formula = y ~ splines::bs(x, 6), se = FALSE) +
-  labs(x = "Data", y = "Infectados") 
+deaths_confirmed_brasil <-deaths_confirmed %>% filter(`Country/Region` == 'Brazil')
+deaths_confirmed_brasil <-deaths_confirmed_brasil[,5:dim(deaths_confirmed_brasil)[2]]
+dim(deaths_confirmed_brasil)
 
 
-# Gráfico Infectados
-total %>% 
-  filter( country %in% c('Brazil','Portugal')) %>% 
-  ggplot( aes( x = date,
-               y = infected,
-               colour = country) ) +
-  geom_point() +
-  geom_line() 
+deaths_confirmed_portugal <-deaths_confirmed %>% filter(`Country/Region` == 'Portugal')
+deaths_confirmed_portugal <-deaths_confirmed_portugal[,5:dim(deaths_confirmed_portugal)[2]]
 
 
-# Gráfico Mortos
-total %>% 
-  filter( country %in% c('Brazil','Portugal')) %>% 
-  ggplot( aes( x = date,
-               y = mortos,
-               colour = country) ) +
-  geom_point() +
-  geom_line() 
 
-# Gráfico Recuperados
-total2 %>% 
-  filter( country %in% c('Brazil','Portugal')) %>% 
-  ggplot( aes( x = date,
-               y = recovered,
-               colour = country) ) +
-  geom_point() +
-  geom_line()
-             
-                                  
+deaths_confirmed_paises <- rbind(deaths_confirmed_brasil, deaths_confirmed_portugal)
+deaths_confirmed_paises<-t(deaths_confirmed_paises)
+colnames(deaths_confirmed_paises)<-c('Brasil','Portugal')
+
+
+deaths_confirmed_paises_long<-as.data.frame(deaths_confirmed_paises) %>% gather(pais, casos)
+
+
+deaths_long_1 <- deaths_confirmed_paises_long %>% filter(casos>0)
+
+tempo_deaths_brasil<-1:dim(deaths_long_1 %>% filter(pais=='Brasil'))[1]
+tempo_deaths_portugal<-1:dim(deaths_long_1 %>% filter(pais=='Portugal'))[1]
+
+deaths_long_1$tempo_1<-c(tempo_deaths_brasil, tempo_deaths_portugal)
+
+death_gif_1 <- ggplot(deaths_long_1, aes(x=tempo_1, y=casos, group=pais)) +
+  ggtitle("COVID-19 - Mortalidade acumulada", subtitle = "Trajetória após a primeira mortalidade")+
+  labs(y="Número de Mortos ", x = "Tempo (dias)", caption = "Atualizado 22/04")+
+  geom_line(size=2,aes(linetype=pais, color=pais)) +
+  geom_segment(aes(xend=max(tempo_1), yend = casos), linetype=2, colour='black') +
+  geom_point(size = 3) + 
+  geom_text(size=5,aes(x = max(tempo_1), label = pais), hjust = 0) +
+  transition_reveal(tempo_1) + 
+  view_follow(fixed_y = TRUE)+
+  coord_cartesian(clip = 'off') + 
+  enter_drift(x_mod = -1) + exit_drift(x_mod = 1) +
+  theme_light(base_size = 14) + 
+  theme(plot.subtitle=element_text(size=12,  color="black"))+
+  theme(plot.margin = margin(1.0, 40, 1.0, 1.0),legend.position = "none")
+
+gif_deaths<-animate(death_gif_1, fps=4, duration = 25, renderer = gifski_renderer(loop = T))
+anim_save("paises_deaths_10.gif", gif_deaths)
+
+death_gif_1
+
+# ------------------------------------------------------
+
+confirmedPath <- 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv'
+dados_paises_covid_confirmed <- read_csv(confirmedPath)
+
+head(dados_paises_covid_confirmed)
+colnames(dados_paises_covid_confirmed)
+
+dim(dados_paises_covid_confirmed)
+
+paises<-c('Brazil', 'Portugal')
+
+covid_confirmed_subset<-dados_paises_covid_confirmed %>% filter(`Country/Region` %in% paises)
+head(covid_confirmed_subset)
+
+covid_confirmed_subset_df<-as.data.frame(t(covid_confirmed_subset[,5:62]))
+head(covid_confirmed_subset_df)
+
+colnames(covid_confirmed_subset_df)<-c("Portugal", "Brasil")
+
+dim(covid_confirmed_subset_df)
+tempo<-c(1:58)
+covid_confirmed_subset_df$tempo<-tempo
+covid_df_long<-covid_confirmed_subset_df %>% gather(pais, casos, Portugal:Brasil)
+
+
+
+covid_df_long_brasil<-covid_df_long %>% filter(pais=="Brasil")
+covid_df_long_portugal<-covid_df_long %>% filter(pais=="Portugal")
+
+
+p_brasil<-ggplot(covid_df_long_brasil, aes(tempo, casos, group = pais)) + 
+  geom_line(size = 2, color='green') +transition_reveal(tempo)+
+  geom_point(size = 5, color='green')+
+  view_follow(fixed_y = c(0.0001,NA))+
+  labs(title = 'Brasil - 21/04/2020', y = 'Casos Covid-19')+
+  theme_minimal(base_size = 20) + 
+  theme(plot.margin = margin(5.5, 40, 5.5, 5.5))
+gif_brasil<-animate(p_brasil, fps=4, width = 400, height = 400,  renderer = gifski_renderer(loop = F))
+anim_save("brasil.gif", gif_brasil)
+
+
+
+p_portugal<-ggplot(covid_df_long_portugal, aes(tempo, casos, group = pais)) + 
+  geom_line(size = 2, color='red') +transition_reveal(tempo)+
+  geom_point(size = 5, color='red')+
+  view_follow(fixed_y = c(0.0001,NA))+
+  labs(title = 'Portugal - 21/04/2020', y = 'Casos Covid-19')+
+  theme_minimal(base_size = 22) + 
+  theme(plot.margin = margin(5.5, 40, 5.5, 5.5))
+gif_portugal<-animate(p_portugal, fps=4, width = 400, height = 400,  renderer = gifski_renderer(loop = F))
+anim_save("portugal.gif", gif_portugal)
+
+a_mgif <- image_read('brasil.gif')
+b_mgif <- image_read('portugal.gif')
+
+new_gif <- image_append(c(a_mgif[1], b_mgif[1]))
+for(i in 2:100){
+  combined <- image_append(c(a_mgif[i], b_mgif[i]))
+  new_gif <- c(new_gif, combined)
+}
+
+image_write(new_gif, path="covid_rodrigo.gif")
+
